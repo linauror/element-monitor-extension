@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Element Monitor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 id="popupTitle">Element Monitor</h1>
+      <input type="text" id="searchInput" class="search-input" placeholder="">
+      <button type="button" id="pickElement" class="btn-pick-main">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h4v4H4zM16 4h4v4h-4zM4 16h4v4H4zM16 16h4v4h-4z"/>
+          <path d="M9 9h6v6H9z" fill="currentColor"/>
+        </svg>
+      </button>
+      <div id="pickStatus" class="pick-status"></div>
+    </header>
+
+    <!-- Task List -->
+    <div class="task-list-section">
+      <div id="taskList" class="task-list"></div>
+      <div id="emptyState" class="empty-state">
+        <p id="emptyStateText"></p>
+      </div>
+      <div id="pagination" class="pagination"></div>
+    </div>
+  </div>
+
+  <!-- Edit Interval Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="editModalTitle"></h3>
+        <button id="modalClose" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label id="intervalLabel"></label>
+          <input type="range" id="editIntervalSlider" min="0" max="14" value="2" step="1" class="interval-slider">
+          <div class="slider-labels">
+            <span id="sliderMinLabel"></span>
+            <span id="sliderMaxLabel"></span>
+          </div>
+          <div class="interval-display"><span id="currentIntervalPrefix"></span><span id="editIntervalValue"></span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalCancel" class="btn btn-secondary"></button>
+        <button id="modalSave" class="btn btn-primary"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

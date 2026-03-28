@@ -1,0 +1,233 @@
+{
+  "extensionName": {
+    "message": "网页监听器",
+    "description": "扩展名称"
+  },
+  "extensionDescription": {
+    "message": "监听网页元素变化并发送通知",
+    "description": "扩展描述"
+  },
+  "contextMenuSelectElement": {
+    "message": "选择元素监听...",
+    "description": "右键菜单文本"
+  },
+  "popupTitle": {
+    "message": "网页监听器",
+    "description": "弹窗标题"
+  },
+  "searchPlaceholder": {
+    "message": "搜索任务...",
+    "description": "搜索框占位符"
+  },
+  "pickElementTitle": {
+    "message": "从页面选择监听元素",
+    "description": "选择元素按钮提示"
+  },
+  "noTasks": {
+    "message": "暂无任务，点击 + 添加",
+    "description": "空状态提示"
+  },
+  "statusRunning": {
+    "message": "运行",
+    "description": "任务状态：运行中"
+  },
+  "statusPaused": {
+    "message": "暂停",
+    "description": "任务状态：已暂停"
+  },
+  "statusChanged": {
+    "message": "已变动",
+    "description": "任务状态：已变化"
+  },
+  "btnStart": {
+    "message": "启动",
+    "description": "启动按钮提示"
+  },
+  "btnPause": {
+    "message": "暂停",
+    "description": "暂停按钮提示"
+  },
+  "btnCheckNow": {
+    "message": "立即检查",
+    "description": "立即检查按钮提示"
+  },
+  "btnEditInterval": {
+    "message": "编辑间隔",
+    "description": "编辑间隔按钮提示"
+  },
+  "btnDelete": {
+    "message": "删除",
+    "description": "删除按钮提示"
+  },
+  "btnOpenPage": {
+    "message": "打开页面",
+    "description": "打开页面按钮提示"
+  },
+  "prevPage": {
+    "message": "上一页",
+    "description": "上一页按钮"
+  },
+  "nextPage": {
+    "message": "下一页",
+    "description": "下一页按钮"
+  },
+  "editIntervalTitle": {
+    "message": "编辑轮询间隔",
+    "description": "编辑间隔弹窗标题"
+  },
+  "intervalLabel": {
+    "message": "轮询间隔",
+    "description": "间隔标签"
+  },
+  "currentInterval": {
+    "message": "当前：",
+    "description": "当前间隔前缀"
+  },
+  "btnCancel": {
+    "message": "取消",
+    "description": "取消按钮"
+  },
+  "btnSave": {
+    "message": "保存",
+    "description": "保存按钮"
+  },
+  "confirmDelete": {
+    "message": "确定删除？",
+    "description": "删除确认"
+  },
+  "pickBannerText": {
+    "message": "点击选择要监听的元素",
+    "description": "选择器横幅文本"
+  },
+  "pickBannerHint": {
+    "message": "(按 ESC 取消)",
+    "description": "选择器横幅提示"
+  },
+  "saveDialogTitle": {
+    "message": "保存监听任务",
+    "description": "保存对话框标题"
+  },
+  "taskNameLabel": {
+    "message": "任务名称",
+    "description": "任务名称标签"
+  },
+  "pageUrlLabel": {
+    "message": "页面地址",
+    "description": "页面地址标签"
+  },
+  "selectorLabel": {
+    "message": "元素选择器",
+    "description": "元素选择器标签"
+  },
+  "previewLabel": {
+    "message": "元素内容预览",
+    "description": "元素预览标签"
+  },
+  "intervalSliderLabel": {
+    "message": "轮询间隔",
+    "description": "间隔滑块标签"
+  },
+  "btnSaveTask": {
+    "message": "保存任务",
+    "description": "保存任务按钮"
+  },
+  "interval5s": { "message": "5秒" },
+  "interval10s": { "message": "10秒" },
+  "interval30s": { "message": "30秒" },
+  "interval1m": { "message": "1分钟" },
+  "interval3m": { "message": "3分钟" },
+  "interval5m": { "message": "5分钟" },
+  "interval10m": { "message": "10分钟" },
+  "interval30m": { "message": "30分钟" },
+  "interval1h": { "message": "1小时" },
+  "interval6h": { "message": "6小时" },
+  "interval12h": { "message": "12小时" },
+  "interval1d": { "message": "1天" },
+  "interval1w": { "message": "1周" },
+  "interval1M": { "message": "1月" },
+  "intervalManual": { "message": "手动" },
+  "emptyPreview": {
+    "message": "(空)",
+    "description": "空元素预览"
+  },
+  "untitledTask": {
+    "message": "未命名任务",
+    "description": "默认任务名称"
+  },
+  "justNow": {
+    "message": "刚刚",
+    "description": "时间：刚刚"
+  },
+  "minutesAgo": {
+    "message": "分钟前",
+    "description": "时间：分钟前"
+  },
+  "hoursAgo": {
+    "message": "小时前",
+    "description": "时间：小时前"
+  },
+  "daysAgo": {
+    "message": "天前",
+    "description": "时间：天前"
+  },
+  "never": {
+    "message": "从未",
+    "description": "时间：从未检查"
+  },
+  "notificationTaskSaved": {
+    "message": "任务已保存",
+    "description": "任务已保存通知标题"
+  },
+  "notificationTaskCreatedManual": {
+    "message": "已创建（仅手动检查）",
+    "description": "任务创建手动模式"
+  },
+  "notificationTaskStarted": {
+    "message": "已启动",
+    "description": "任务已启动"
+  },
+  "notificationElementChanged": {
+    "message": "元素变化：",
+    "description": "元素变化通知前缀"
+  },
+  "notificationTitle": {
+    "message": "元素已选择",
+    "description": "元素已选择通知标题"
+  },
+  "notificationClickToAdd": {
+    "message": "点击扩展图标添加监听任务：",
+    "description": "点击添加通知"
+  },
+  "errorTitle": {
+    "message": "错误",
+    "description": "错误通知标题"
+  },
+  "errorPickerFailed": {
+    "message": "启动元素选择器失败：",
+    "description": "选择器错误消息"
+  },
+  "errorNoActiveTab": {
+    "message": "未找到活动标签页",
+    "description": "无活动标签页错误"
+  },
+  "errorCannotAccess": {
+    "message": "无法访问此页面",
+    "description": "无法访问页面错误"
+  },
+  "elementSelected": {
+    "message": "元素已选择！",
+    "description": "元素已选择状态"
+  },
+  "sendingTest": {
+    "message": "发送测试通知...",
+    "description": "发送测试通知状态"
+  },
+  "notificationSent": {
+    "message": "通知已发送",
+    "description": "通知已发送状态"
+  },
+  "sendFailed": {
+    "message": "发送失败：",
+    "description": "发送失败消息前缀"
+  }
+}

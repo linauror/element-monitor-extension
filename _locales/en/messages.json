@@ -1,0 +1,233 @@
+{
+  "extensionName": {
+    "message": "Element Monitor",
+    "description": "Name of the extension"
+  },
+  "extensionDescription": {
+    "message": "Monitor page element changes and send notifications",
+    "description": "Description of the extension"
+  },
+  "contextMenuSelectElement": {
+    "message": "Select element to monitor...",
+    "description": "Context menu item text"
+  },
+  "popupTitle": {
+    "message": "Element Monitor",
+    "description": "Popup title"
+  },
+  "searchPlaceholder": {
+    "message": "Search tasks...",
+    "description": "Search input placeholder"
+  },
+  "pickElementTitle": {
+    "message": "Select element from page",
+    "description": "Pick element button title"
+  },
+  "noTasks": {
+    "message": "No tasks, click + to add",
+    "description": "Empty state message"
+  },
+  "statusRunning": {
+    "message": "Running",
+    "description": "Task status: running"
+  },
+  "statusPaused": {
+    "message": "Paused",
+    "description": "Task status: paused"
+  },
+  "statusChanged": {
+    "message": "Changed",
+    "description": "Task status: changed"
+  },
+  "btnStart": {
+    "message": "Start",
+    "description": "Start button tooltip"
+  },
+  "btnPause": {
+    "message": "Pause",
+    "description": "Pause button tooltip"
+  },
+  "btnCheckNow": {
+    "message": "Check now",
+    "description": "Check now button tooltip"
+  },
+  "btnEditInterval": {
+    "message": "Edit interval",
+    "description": "Edit interval button tooltip"
+  },
+  "btnDelete": {
+    "message": "Delete",
+    "description": "Delete button tooltip"
+  },
+  "btnOpenPage": {
+    "message": "Open page",
+    "description": "Open page button title"
+  },
+  "prevPage": {
+    "message": "Previous",
+    "description": "Previous page button"
+  },
+  "nextPage": {
+    "message": "Next",
+    "description": "Next page button"
+  },
+  "editIntervalTitle": {
+    "message": "Edit polling interval",
+    "description": "Edit interval modal title"
+  },
+  "intervalLabel": {
+    "message": "Polling interval",
+    "description": "Interval label"
+  },
+  "currentInterval": {
+    "message": "Current: ",
+    "description": "Current interval prefix"
+  },
+  "btnCancel": {
+    "message": "Cancel",
+    "description": "Cancel button"
+  },
+  "btnSave": {
+    "message": "Save",
+    "description": "Save button"
+  },
+  "confirmDelete": {
+    "message": "Are you sure you want to delete?",
+    "description": "Delete confirmation"
+  },
+  "pickBannerText": {
+    "message": "Click to select an element to monitor",
+    "description": "Picker banner text"
+  },
+  "pickBannerHint": {
+    "message": "(Press ESC to cancel)",
+    "description": "Picker banner hint"
+  },
+  "saveDialogTitle": {
+    "message": "Save Monitor Task",
+    "description": "Save dialog title"
+  },
+  "taskNameLabel": {
+    "message": "Task name",
+    "description": "Task name label"
+  },
+  "pageUrlLabel": {
+    "message": "Page URL",
+    "description": "Page URL label"
+  },
+  "selectorLabel": {
+    "message": "Element selector",
+    "description": "Element selector label"
+  },
+  "previewLabel": {
+    "message": "Element content preview",
+    "description": "Element preview label"
+  },
+  "intervalSliderLabel": {
+    "message": "Polling interval",
+    "description": "Interval slider label"
+  },
+  "btnSaveTask": {
+    "message": "Save Task",
+    "description": "Save task button"
+  },
+  "interval5s": { "message": "5 seconds" },
+  "interval10s": { "message": "10 seconds" },
+  "interval30s": { "message": "30 seconds" },
+  "interval1m": { "message": "1 minute" },
+  "interval3m": { "message": "3 minutes" },
+  "interval5m": { "message": "5 minutes" },
+  "interval10m": { "message": "10 minutes" },
+  "interval30m": { "message": "30 minutes" },
+  "interval1h": { "message": "1 hour" },
+  "interval6h": { "message": "6 hours" },
+  "interval12h": { "message": "12 hours" },
+  "interval1d": { "message": "1 day" },
+  "interval1w": { "message": "1 week" },
+  "interval1M": { "message": "1 month" },
+  "intervalManual": { "message": "Manual" },
+  "emptyPreview": {
+    "message": "(empty)",
+    "description": "Empty element preview"
+  },
+  "untitledTask": {
+    "message": "Untitled Task",
+    "description": "Default task name"
+  },
+  "justNow": {
+    "message": "Just now",
+    "description": "Time: just now"
+  },
+  "minutesAgo": {
+    "message": " minutes ago",
+    "description": "Time: minutes ago (prefix number)"
+  },
+  "hoursAgo": {
+    "message": " hours ago",
+    "description": "Time: hours ago (prefix number)"
+  },
+  "daysAgo": {
+    "message": " days ago",
+    "description": "Time: days ago (prefix number)"
+  },
+  "never": {
+    "message": "Never",
+    "description": "Time: never checked"
+  },
+  "notificationTaskSaved": {
+    "message": "Task saved",
+    "description": "Task saved notification title"
+  },
+  "notificationTaskCreatedManual": {
+    "message": "created (manual check only)",
+    "description": "Task created manual mode"
+  },
+  "notificationTaskStarted": {
+    "message": "started",
+    "description": "Task started"
+  },
+  "notificationElementChanged": {
+    "message": "Element changed: ",
+    "description": "Element changed notification prefix"
+  },
+  "notificationTitle": {
+    "message": "Element Selected",
+    "description": "Element selected notification title"
+  },
+  "notificationClickToAdd": {
+    "message": "Click extension icon to add monitor task: ",
+    "description": "Click to add notification"
+  },
+  "errorTitle": {
+    "message": "Error",
+    "description": "Error notification title"
+  },
+  "errorPickerFailed": {
+    "message": "Failed to start element picker: ",
+    "description": "Picker error message"
+  },
+  "errorNoActiveTab": {
+    "message": "No active tab found",
+    "description": "No active tab error"
+  },
+  "errorCannotAccess": {
+    "message": "Cannot access this page",
+    "description": "Cannot access page error"
+  },
+  "elementSelected": {
+    "message": "Element selected!",
+    "description": "Element selected status"
+  },
+  "sendingTest": {
+    "message": "Sending test notification...",
+    "description": "Sending test notification status"
+  },
+  "notificationSent": {
+    "message": "Notification sent",
+    "description": "Notification sent status"
+  },
+  "sendFailed": {
+    "message": "Send failed: ",
+    "description": "Send failed message prefix"
+  }
+}
