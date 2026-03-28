@@ -1,3 +1,5 @@
+中文文档 | [English Documentation](./README.md)
+
 # 网页监听器 (Element Monitor)
 
 一款 Chrome/Edge 浏览器扩展，用于监听指定网页元素的变化，并在检测到变化时发送系统通知。
@@ -83,7 +85,3 @@ element-monitor-extension/
 - Chrome / Edge 浏览器
 - Manifest V3
 - Windows / macOS / Linux
-
----
-
-[English Documentation](./README.md)

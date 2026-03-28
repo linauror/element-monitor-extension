@@ -1,3 +1,5 @@
+English Documentation | [中文文档](./README_CN.md)
+
 # Element Monitor
 
 A Chrome/Edge browser extension that monitors web page element changes and sends system notifications when changes are detected.
@@ -83,7 +85,3 @@ element-monitor-extension/
 - Chrome / Edge browser
 - Manifest V3
 - Windows / macOS / Linux
-
----
-
-[中文文档](./README_CN.md)
