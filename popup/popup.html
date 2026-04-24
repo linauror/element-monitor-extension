@@ -40,12 +40,19 @@
       <div class="modal-body">
         <div class="form-group">
           <label id="intervalLabel"></label>
-          <input type="range" id="editIntervalSlider" min="0" max="14" value="2" step="1" class="interval-slider">
+          <input type="range" id="editIntervalSlider" min="0" max="9" value="0" step="1" class="interval-slider">
           <div class="slider-labels">
             <span id="sliderMinLabel"></span>
             <span id="sliderMaxLabel"></span>
           </div>
           <div class="interval-display"><span id="currentIntervalPrefix"></span><span id="editIntervalValue"></span></div>
+        </div>
+        <div class="form-group custom-interval-group">
+          <label id="customIntervalLabel"></label>
+          <div class="custom-interval-row">
+            <input type="number" id="customIntervalInput" min="1" max="525600" placeholder="" class="custom-interval-input">
+            <span id="customIntervalUnit"></span>
+          </div>
         </div>
       </div>
       <div class="modal-footer">

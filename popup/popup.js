@@ -11,11 +11,7 @@ let allTasks = [];
 const i18n = {
   get: (key, sub) => chrome.i18n.getMessage(key, sub) || key,
   getIntervalOptions: () => [
-    { value: 5, label: chrome.i18n.getMessage('interval5s') || '5 seconds' },
-    { value: 10, label: chrome.i18n.getMessage('interval10s') || '10 seconds' },
-    { value: 30, label: chrome.i18n.getMessage('interval30s') || '30 seconds' },
     { value: 60, label: chrome.i18n.getMessage('interval1m') || '1 minute' },
-    { value: 180, label: chrome.i18n.getMessage('interval3m') || '3 minutes' },
     { value: 300, label: chrome.i18n.getMessage('interval5m') || '5 minutes' },
     { value: 600, label: chrome.i18n.getMessage('interval10m') || '10 minutes' },
     { value: 1800, label: chrome.i18n.getMessage('interval30m') || '30 minutes' },
@@ -24,7 +20,6 @@ const i18n = {
     { value: 43200, label: chrome.i18n.getMessage('interval12h') || '12 hours' },
     { value: 86400, label: chrome.i18n.getMessage('interval1d') || '1 day' },
     { value: 604800, label: chrome.i18n.getMessage('interval1w') || '1 week' },
-    { value: 2592000, label: chrome.i18n.getMessage('interval1M') || '1 month' },
     { value: 0, label: chrome.i18n.getMessage('intervalManual') || 'Manual' }
   ]
 };
@@ -62,11 +57,13 @@ function initI18n() {
   document.getElementById('emptyStateText').textContent = i18n.get('noTasks');
   document.getElementById('editModalTitle').textContent = i18n.get('editIntervalTitle');
   document.getElementById('intervalLabel').textContent = i18n.get('intervalLabel');
-  document.getElementById('sliderMinLabel').textContent = i18n.get('interval5s');
+  document.getElementById('sliderMinLabel').textContent = i18n.get('interval1m');
   document.getElementById('sliderMaxLabel').textContent = i18n.get('intervalManual');
   document.getElementById('currentIntervalPrefix').textContent = i18n.get('currentInterval');
   document.getElementById('modalCancel').textContent = i18n.get('btnCancel');
   document.getElementById('modalSave').textContent = i18n.get('btnSave');
+  document.getElementById('customIntervalLabel').textContent = i18n.get('customIntervalLabel');
+  document.getElementById('customIntervalUnit').textContent = i18n.get('customIntervalUnit');
 }
 
 function setupEventListeners() {
@@ -81,6 +78,21 @@ function setupEventListeners() {
   editSlider.addEventListener('input', () => {
     const option = intervalOptions[parseInt(editSlider.value, 10)];
     document.getElementById('editIntervalValue').textContent = option.label;
+    // Clear custom input when slider is used
+    document.getElementById('customIntervalInput').value = '';
+  });
+
+  const customInput = document.getElementById('customIntervalInput');
+  customInput.addEventListener('input', () => {
+    // Show formatted display when custom input is used
+    if (customInput.value) {
+      const minutes = parseInt(customInput.value, 10);
+      document.getElementById('editIntervalValue').textContent = minutes > 0 ? formatMinutesReadable(minutes) : '';
+    } else {
+      // Restore slider display when input is cleared
+      const option = intervalOptions[parseInt(editSlider.value, 10)];
+      document.getElementById('editIntervalValue').textContent = option.label;
+    }
   });
 
   document.getElementById('editModal').addEventListener('click', (e) => {
@@ -104,34 +116,16 @@ async function restorePickState() {
 }
 
 async function loadTasks() {
-  // Try sync storage first, fallback to local for migration
-  let { tasks = null } = await chrome.storage.sync.get('tasks');
-  
-  // If sync is empty, check local storage (migration case)
-  if (!tasks || tasks.length === 0) {
-    const localData = await chrome.storage.local.get('tasks');
-    if (localData.tasks && localData.tasks.length > 0) {
-      tasks = localData.tasks;
-      // Migrate to sync storage
-      await chrome.storage.sync.set({ tasks });
-      console.log('Migrated tasks from local to sync storage');
-    } else {
-      tasks = [];
-    }
-  }
+  // Load tasks from local storage
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
+
+  console.log('Loaded tasks:', tasks.map(t => ({ id: t.id, name: t.name, hasChanged: t.hasChanged, lastChangedAt: t.lastChangedAt })));
 
   // Store all tasks for filtering
   allTasks = tasks;
 
-  // Sort tasks: changed tasks first, then by lastCheck time
-  const sortedTasks = tasks.sort((a, b) => {
-    if (a.hasChanged && !b.hasChanged) return -1;
-    if (!a.hasChanged && b.hasChanged) return 1;
-    return (b.lastCheck || 0) - (a.lastCheck || 0);
-  });
-
   renderFilteredTasks();
-  updateBadge(sortedTasks);
+  updateBadge(tasks);
 }
 
 function handleSearch(e) {
@@ -150,11 +144,27 @@ function renderFilteredTasks() {
     );
   }
 
-  // Sort: changed tasks first, then by lastCheck time
+  // Sort by lastChangedAt (content change time)
+  // - Tasks with lastChangedAt come first (most recent first)
+  // - Tasks without lastChangedAt (never changed) keep their original order (by createdAt)
   const sortedTasks = filteredTasks.sort((a, b) => {
-    if (a.hasChanged && !b.hasChanged) return -1;
-    if (!a.hasChanged && b.hasChanged) return 1;
-    return (b.lastCheck || 0) - (a.lastCheck || 0);
+    const aTime = a.lastChangedAt || 0;
+    const bTime = b.lastChangedAt || 0;
+    
+    // Both have lastChangedAt - sort by time (newest first)
+    if (aTime > 0 && bTime > 0) {
+      return bTime - aTime;
+    }
+    // Only a has lastChangedAt - a comes first
+    if (aTime > 0 && bTime === 0) {
+      return -1;
+    }
+    // Only b has lastChangedAt - b comes first
+    if (aTime === 0 && bTime > 0) {
+      return 1;
+    }
+    // Neither has lastChangedAt - sort by createdAt (newest first)
+    return (b.createdAt || 0) - (a.createdAt || 0);
   });
 
   renderTasks(sortedTasks);
@@ -201,14 +211,14 @@ function renderTasks(tasks) {
 }
 
 async function openUrl(taskId) {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
 
   // Clear changed flag
   if (task.hasChanged) {
     task.hasChanged = false;
-    await chrome.storage.sync.set({ tasks });
+    await chrome.storage.local.set({ tasks });
     loadTasks();
   }
 
@@ -239,9 +249,38 @@ function renderPagination(totalItems) {
   });
 }
 
+function formatMinutesReadable(minutes) {
+  if (minutes < 60) {
+    return `${minutes}${i18n.get('customIntervalUnit')}`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+  const hourUnit = i18n.get('intervalHour');
+  const dayUnit = i18n.get('intervalDay');
+  const minUnit = i18n.get('customIntervalUnit');
+
+  if (remainMinutes === 0) {
+    if (hours < 24) return `${hours}${hourUnit}`;
+    const days = Math.floor(hours / 24);
+    const remainHours = hours % 24;
+    if (remainHours === 0) return `${days}${dayUnit}`;
+    return `${days}${dayUnit}${remainHours}${hourUnit}`;
+  }
+  if (hours < 24) return `${hours}${hourUnit}${remainMinutes}${minUnit}`;
+  const days = Math.floor(hours / 24);
+  const remainHours = hours % 24;
+  let result = `${days}${dayUnit}`;
+  if (remainHours > 0) result += `${remainHours}${hourUnit}`;
+  result += `${remainMinutes}${minUnit}`;
+  return result;
+}
+
 function formatInterval(seconds) {
   const option = intervalOptions.find(o => o.value === seconds);
-  return option ? option.label : i18n.get('intervalManual');
+  if (option) return option.label;
+  if (seconds === 0) return i18n.get('intervalManual');
+  // Format custom interval
+  return formatMinutesReadable(Math.round(seconds / 60));
 }
 
 function formatLastCheck(timestamp) {
@@ -291,7 +330,9 @@ function createTaskHTML(task) {
         <span class="task-preview">${escapeHtml(lastValue)}</span>
         <div class="task-meta">
           <span class="task-meta-item interval" title="${i18n.get('intervalLabel')}">${formatInterval(task.interval)}</span>
-          <span class="task-meta-item lastcheck" title="${i18n.get('lastCheck', 'Last check')}">${formatLastCheck(task.lastCheck)}</span>
+          <span class="task-meta-item checkcount" title="${i18n.get('checkCountLabel')}">${task.checkCount || 0}</span>
+          <span class="task-meta-item lastcheck" title="${i18n.get('lastCheckLabel')}">${i18n.get('lastCheckLabel')}: ${formatLastCheck(task.lastCheck)}</span>
+          <span class="task-meta-item lastchanged" title="${i18n.get('lastChangedLabel')}">${i18n.get('lastChangedLabel')}: ${formatLastCheck(task.lastChangedAt)}</span>
         </div>
       </div>
     </div>
@@ -305,39 +346,74 @@ function escapeHtml(text) {
 }
 
 async function toggleTask(taskId) {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
 
   task.status = task.status === 'active' ? 'paused' : 'active';
-  await chrome.storage.sync.set({ tasks });
+  await chrome.storage.local.set({ tasks });
 
   chrome.runtime.sendMessage({ type: 'TOGGLE_TASK', taskId, status: task.status });
   loadTasks();
 }
 
 async function checkNow(taskId) {
-  chrome.runtime.sendMessage({ type: 'CHECK_NOW', taskId });
-
+  console.log('checkNow called for task:', taskId);
+  
   const taskEl = document.getElementById(`task-${taskId}`);
-  const btn = taskEl.querySelector('.btn-check');
-  btn.disabled = true;
-  setTimeout(() => { btn.disabled = false; }, 2000);
+  if (taskEl) {
+    const btn = taskEl.querySelector('.btn-check');
+    if (btn) {
+      btn.disabled = true;
+      setTimeout(() => { btn.disabled = false; }, 5000);
+    }
+  }
+
+  try {
+    // Send message - Service Worker should wake up automatically
+    const response = await chrome.runtime.sendMessage({ type: 'CHECK_NOW', taskId });
+    console.log('checkNow response:', response);
+  } catch (error) {
+    console.error('checkNow error:', error);
+  }
 }
 
 function openEditModal(taskId) {
   editingTaskId = taskId;
 
-  chrome.storage.sync.get('tasks').then(({ tasks = [] }) => {
+  chrome.storage.local.get('tasks').then(({ tasks = [] }) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
     const sliderIndex = intervalOptions.findIndex(opt => opt.value === task.interval);
     const editSlider = document.getElementById('editIntervalSlider');
-    editSlider.value = sliderIndex >= 0 ? sliderIndex : 2;
+    const customInput = document.getElementById('customIntervalInput');
+    const displayEl = document.getElementById('editIntervalValue');
 
-    const option = intervalOptions[parseInt(editSlider.value, 10)];
-    document.getElementById('editIntervalValue').textContent = option.label;
+    if (sliderIndex >= 0) {
+      editSlider.value = sliderIndex;
+      displayEl.textContent = intervalOptions[sliderIndex].label;
+      customInput.value = '';
+    } else {
+      // Custom interval - move slider to closest position and show custom input
+      customInput.value = Math.round(task.interval / 60);
+      displayEl.textContent = formatMinutesReadable(Math.round(task.interval / 60));
+
+      // Find closest slider position
+      const minutes = task.interval / 60;
+      let closestIndex = 0;
+      let closestDiff = Infinity;
+      for (let i = 0; i < intervalOptions.length; i++) {
+        if (intervalOptions[i].value === 0) continue;
+        const optMinutes = intervalOptions[i].value / 60;
+        const diff = Math.abs(optMinutes - minutes);
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          closestIndex = i;
+        }
+      }
+      editSlider.value = closestIndex;
+    }
 
     document.getElementById('editModal').classList.add('show');
   });
@@ -351,24 +427,35 @@ function closeEditModal() {
 async function saveInterval() {
   if (!editingTaskId) return;
 
-  const editSlider = document.getElementById('editIntervalSlider');
-  const option = intervalOptions[parseInt(editSlider.value, 10)];
+  const customInput = document.getElementById('customIntervalInput');
+  const customMinutes = parseInt(customInput.value, 10);
+  let intervalSeconds;
 
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  if (customMinutes > 0) {
+    // Use custom interval (minimum 1 minute)
+    intervalSeconds = Math.max(60, customMinutes * 60);
+  } else {
+    // Use slider option
+    const editSlider = document.getElementById('editIntervalSlider');
+    const option = intervalOptions[parseInt(editSlider.value, 10)];
+    intervalSeconds = option.value;
+  }
+
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === editingTaskId);
   if (!task) return;
 
-  task.interval = option.value;
-  if (option.value === 0 && task.status === 'active') {
+  task.interval = intervalSeconds;
+  if (intervalSeconds === 0 && task.status === 'active') {
     task.status = 'paused';
   }
 
-  await chrome.storage.sync.set({ tasks });
+  await chrome.storage.local.set({ tasks });
 
   chrome.runtime.sendMessage({
     type: 'UPDATE_INTERVAL',
     taskId: editingTaskId,
-    interval: option.value,
+    interval: intervalSeconds,
     status: task.status
   });
 
@@ -379,9 +466,9 @@ async function saveInterval() {
 async function deleteTask(taskId) {
   if (!confirm(i18n.get('confirmDelete'))) return;
 
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const filteredTasks = tasks.filter(t => t.id !== taskId);
-  await chrome.storage.sync.set({ tasks: filteredTasks });
+  await chrome.storage.local.set({ tasks: filteredTasks });
 
   chrome.runtime.sendMessage({ type: 'DELETE_TASK', taskId });
 

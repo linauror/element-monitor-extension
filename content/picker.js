@@ -11,11 +11,7 @@
 
   // Interval options for slider
   const intervalOptions = [
-    { value: 5, label: i18n.get('interval5s') },
-    { value: 10, label: i18n.get('interval10s') },
-    { value: 30, label: i18n.get('interval30s') },
     { value: 60, label: i18n.get('interval1m') },
-    { value: 180, label: i18n.get('interval3m') },
     { value: 300, label: i18n.get('interval5m') },
     { value: 600, label: i18n.get('interval10m') },
     { value: 1800, label: i18n.get('interval30m') },
@@ -24,7 +20,6 @@
     { value: 43200, label: i18n.get('interval12h') },
     { value: 86400, label: i18n.get('interval1d') },
     { value: 604800, label: i18n.get('interval1w') },
-    { value: 2592000, label: i18n.get('interval1M') },
     { value: 0, label: i18n.get('intervalManual') }
   ];
 
@@ -453,7 +448,7 @@
     intervalGroup.appendChild(slider);
 
     const sliderLabels = document.createElement('div');
-    sliderLabels.innerHTML = `<span>${i18n.get('interval5s')}</span><span>${i18n.get('intervalManual')}</span>`;
+    sliderLabels.innerHTML = `<span>${i18n.get('interval1m')}</span><span>${i18n.get('intervalManual')}</span>`;
     Object.assign(sliderLabels.style, {
       display: 'flex',
       justifyContent: 'space-between',

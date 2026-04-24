@@ -343,9 +343,20 @@ header .btn-pick-main {
   color: #2e7d32;
 }
 
+.task-meta-item.checkcount {
+  background: #e3f2fd;
+  color: #1565c0;
+  font-weight: 600;
+}
+
 .task-meta-item.lastcheck {
   background: #f5f5f5;
   color: #666;
+}
+
+.task-meta-item.lastchanged {
+  background: #fff3e0;
+  color: #ef6c00;
 }
 
 .empty-state {
@@ -520,4 +531,43 @@ header .btn-pick-main {
 .interval-display span {
   font-weight: 600;
   color: #1976d2;
+}
+
+/* Custom Interval Input */
+.custom-interval-group {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.custom-interval-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-interval-input {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  text-align: center;
+}
+
+.custom-interval-input:focus {
+  border-color: #1976d2;
+}
+
+.custom-interval-input::-webkit-inner-spin-button,
+.custom-interval-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+#customIntervalUnit {
+  font-size: 12px;
+  color: #666;
 }

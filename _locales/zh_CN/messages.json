@@ -79,6 +79,26 @@
     "message": "轮询间隔",
     "description": "间隔标签"
   },
+  "checkCountLabel": {
+    "message": "检测次数",
+    "description": "检测次数标签"
+  },
+  "customIntervalLabel": {
+    "message": "自定义间隔",
+    "description": "自定义间隔标签"
+  },
+  "customIntervalUnit": {
+    "message": "分钟",
+    "description": "自定义间隔单位"
+  },
+  "intervalHour": {
+    "message": "小时",
+    "description": "间隔时间单位：小时"
+  },
+  "intervalDay": {
+    "message": "天",
+    "description": "间隔时间单位：天"
+  },
   "currentInterval": {
     "message": "当前：",
     "description": "当前间隔前缀"
@@ -135,11 +155,13 @@
   "interval10s": { "message": "10秒" },
   "interval30s": { "message": "30秒" },
   "interval1m": { "message": "1分钟" },
+  "interval2m": { "message": "2分钟" },
   "interval3m": { "message": "3分钟" },
   "interval5m": { "message": "5分钟" },
   "interval10m": { "message": "10分钟" },
   "interval30m": { "message": "30分钟" },
   "interval1h": { "message": "1小时" },
+  "interval2h": { "message": "2小时" },
   "interval6h": { "message": "6小时" },
   "interval12h": { "message": "12小时" },
   "interval1d": { "message": "1天" },
@@ -173,6 +195,14 @@
   "never": {
     "message": "从未",
     "description": "时间：从未检查"
+  },
+  "lastCheckLabel": {
+    "message": "上次检查",
+    "description": "上次检查标签"
+  },
+  "lastChangedLabel": {
+    "message": "上次变化",
+    "description": "上次变化标签"
   },
   "notificationTaskSaved": {
     "message": "任务已保存",

@@ -12,20 +12,11 @@ const i18n = {
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('Element Monitor extension installed');
 
-  // Try sync storage first, migrate from local if needed
-  let { tasks = null } = await chrome.storage.sync.get('tasks');
-  
+  // Initialize tasks in local storage if not exists
+  const { tasks } = await chrome.storage.local.get('tasks');
   if (!tasks) {
-    // Check local storage for migration
-    const localData = await chrome.storage.local.get('tasks');
-    if (localData.tasks && localData.tasks.length > 0) {
-      tasks = localData.tasks;
-      await chrome.storage.sync.set({ tasks });
-      console.log('Migrated tasks from local to sync storage');
-    } else {
-      tasks = [];
-      await chrome.storage.sync.set({ tasks });
-    }
+    await chrome.storage.local.set({ tasks: [] });
+    console.log('Initialized empty tasks array');
   }
 
   // Create context menu
@@ -63,43 +54,91 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch (message.type) {
-    case 'ADD_TASK':
-      handleAddTask(message.task);
-      break;
-    case 'SAVE_TASK':
-      handleSaveTask(message.task);
-      break;
-    case 'TOGGLE_TASK':
-      handleToggleTask(message.taskId, message.status);
-      break;
-    case 'UPDATE_INTERVAL':
-      handleUpdateInterval(message.taskId, message.interval, message.status);
-      break;
-    case 'CHECK_NOW':
-      handleCheckNow(message.taskId);
-      break;
-    case 'DELETE_TASK':
-      handleDeleteTask(message.taskId);
-      break;
-    case 'ELEMENT_VALUE':
-      handleElementValue(message);
-      break;
-    case 'ELEMENT_SELECTED':
-      handleElementSelected(message);
-      break;
-    case 'ELEMENT_PICK_CANCELLED':
-      handleElementPickCancelled();
-      break;
-  }
+  console.log('Received message:', message.type, message);
   
+  if (message.type === 'GET_DEBUG_INFO') {
+    handleGetDebugInfo().then(sendResponse);
+    return true; // Keep channel open for async response
+  }
+
+  // Handle async operations - fire and forget
+  (async () => {
+    try {
+      switch (message.type) {
+        case 'ADD_TASK':
+          await handleAddTask(message.task);
+          break;
+        case 'SAVE_TASK':
+          await handleSaveTask(message.task);
+          break;
+        case 'TOGGLE_TASK':
+          await handleToggleTask(message.taskId, message.status);
+          break;
+        case 'UPDATE_INTERVAL':
+          await handleUpdateInterval(message.taskId, message.interval, message.status);
+          break;
+        case 'CHECK_NOW':
+          await handleCheckNow(message.taskId);
+          break;
+        case 'DELETE_TASK':
+          await handleDeleteTask(message.taskId);
+          break;
+        case 'ELEMENT_VALUE':
+          await handleElementValue(message);
+          break;
+        case 'ELEMENT_SELECTED':
+          await handleElementSelected(message);
+          break;
+        case 'ELEMENT_PICK_CANCELLED':
+          await handleElementPickCancelled();
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
+    }
+  })();
+  
+  sendResponse({ ok: true });
   return false;
 });
 
+// Handle get debug info
+async function handleGetDebugInfo() {
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
+  const alarms = await chrome.alarms.getAll();
+  return {
+    tasks: tasks.map(t => ({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      interval: t.interval,
+      lastCheck: t.lastCheck ? new Date(t.lastCheck).toISOString() : null
+    })),
+    alarms: alarms.map(a => ({
+      name: a.name,
+      scheduledTime: new Date(a.scheduledTime).toISOString(),
+      periodInMinutes: a.periodInMinutes
+    })),
+  };
+}
+
 // Listen for alarms
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  console.log('Alarm triggered:', alarm.name, alarm.scheduledTime);
   if (alarm.name.startsWith('monitor_')) {
     const taskId = alarm.name.replace('monitor_', '');
+    console.log(`Checking task: ${taskId}`);
+    
+    // Check if task exists before checking
+    const { tasks = [] } = await chrome.storage.local.get('tasks');
+    const task = tasks.find(t => t.id === taskId);
+    
+    if (!task) {
+      console.log(`Task ${taskId} not found, clearing orphan alarm`);
+      await chrome.alarms.clear(alarm.name);
+      return;
+    }
+    
     await checkTask(taskId);
   }
 });
@@ -115,26 +154,37 @@ async function handleAddTask(task) {
 
 // Handle save task from picker dialog
 async function handleSaveTask(taskData) {
+  console.log('handleSaveTask called with:', taskData);
+  
   const task = {
     id: `task_${Date.now()}`,
     url: taskData.url,
     selector: taskData.selector,
-    interval: taskData.interval === 0 ? 0 : Math.max(5, taskData.interval),
+    interval: taskData.interval === 0 ? 0 : Math.max(60, taskData.interval),
     name: taskData.name || new URL(taskData.url).hostname,
-    lastValue: null,
+    lastValue: null, // Initialize as null, first check will set the value
     lastCheck: null,
+    lastChangedAt: null, // Will be set when content changes
+    checkCount: 0, // Number of times this task has been checked
     status: taskData.interval === 0 ? 'paused' : 'active',
     createdAt: Date.now()
   };
 
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
-  tasks.push(task);
-  await chrome.storage.sync.set({ tasks });
+  console.log('Created task:', task);
 
-  // Create alarm if not manual
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
+  tasks.push(task);
+  await chrome.storage.local.set({ tasks });
+
+  console.log('Task saved to storage. Total tasks:', tasks.length);
+
+  // Create alarm and do initial check if not manual
   if (task.interval > 0) {
     await createAlarmForTask(task);
-    await checkTask(task.id);
+    
+    // Do initial check immediately
+    console.log('Starting initial check for task:', task.id);
+    checkTask(task.id).catch(err => console.error('Initial check error:', err));
   }
 
   // Show success notification
@@ -153,7 +203,7 @@ async function handleSaveTask(taskData) {
 
 // Handle toggle task
 async function handleToggleTask(taskId, status) {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
 
   if (!task) return;
@@ -161,21 +211,21 @@ async function handleToggleTask(taskId, status) {
   if (status === 'active') {
     await createAlarmForTask(task);
   } else {
-    await chrome.alarms.clear(`monitor_${taskId}`);
+    await stopTaskScheduler(taskId);
   }
 }
 
 // Handle update interval
 async function handleUpdateInterval(taskId, interval, status) {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
 
   if (!task) return;
 
-  // Clear existing alarm
-  await chrome.alarms.clear(`monitor_${taskId}`);
+  // Clear existing scheduler
+  await stopTaskScheduler(taskId);
 
-  // Create new alarm if active and interval > 0
+  // Create new scheduler if active and interval > 0
   if (status === 'active' && interval > 0) {
     task.interval = interval;
     await createAlarmForTask(task);
@@ -184,12 +234,18 @@ async function handleUpdateInterval(taskId, interval, status) {
 
 // Handle check now
 async function handleCheckNow(taskId) {
-  await checkTask(taskId);
+  console.log(`handleCheckNow called for task: ${taskId}`);
+  try {
+    await checkTask(taskId, true);
+    console.log(`handleCheckNow completed for task: ${taskId}`);
+  } catch (error) {
+    console.error(`handleCheckNow error for task ${taskId}:`, error);
+  }
 }
 
 // Handle delete task
 async function handleDeleteTask(taskId) {
-  await chrome.alarms.clear(`monitor_${taskId}`);
+  await stopTaskScheduler(taskId);
 }
 
 // Handle element selected from picker
@@ -226,19 +282,41 @@ async function handleElementPickCancelled() {
 // Create alarm for a task
 async function createAlarmForTask(task) {
   const alarmName = `monitor_${task.id}`;
-  const intervalMinutes = Math.max(task.interval / 60, 0.1);
+  const intervalSeconds = task.interval;
+  const intervalMinutes = intervalSeconds / 60;
 
+  console.log(`Creating alarm for task ${task.name}: interval=${intervalSeconds}s (${intervalMinutes} minutes)`);
+
+  // All intervals are >= 1 minute, use Chrome alarms
   await chrome.alarms.create(alarmName, {
     periodInMinutes: intervalMinutes
   });
+
+  // Verify alarm was created
+  const alarm = await chrome.alarms.get(alarmName);
+  console.log(`Alarm created: ${alarmName}`, alarm);
+}
+
+// Stop alarm for a task
+async function stopTaskScheduler(taskId) {
+  const alarmName = `monitor_${taskId}`;
+  await chrome.alarms.clear(alarmName);
+  console.log(`Alarm cleared for task: ${taskId}`);
 }
 
 // Check a task
-async function checkTask(taskId) {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+async function checkTask(taskId, closeAfterCheck = false) {
+  console.log(`checkTask called for ${taskId}, closeAfterCheck=${closeAfterCheck}`);
+  
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
 
-  if (!task) return;
+  if (!task) {
+    console.log(`Task ${taskId} not found`);
+    return;
+  }
+
+  console.log(`Found task: ${task.name}, url: ${task.url}`);
 
   let tab = null;
   
@@ -248,39 +326,78 @@ async function checkTask(taskId) {
       try {
         await chrome.tabs.get(checkerTab.id);
         tab = checkerTab;
+        console.log(`Reusing existing checker tab: ${tab.id}`);
       } catch (e) {
+        console.log('Checker tab no longer exists, creating new one');
         checkerTab = null;
       }
     }
     
     // Create a new tab if needed
     if (!tab) {
+      console.log(`Creating new tab for URL: ${task.url}`);
       tab = await chrome.tabs.create({
         url: task.url,
-        active: false
+        active: false,
+        pinned: false
       });
       checkerTab = tab;
+      console.log(`Created tab: ${tab.id}`);
     } else {
+      console.log(`Updating tab ${tab.id} to URL: ${task.url}`);
       await chrome.tabs.update(tab.id, { url: task.url });
     }
 
     // Wait for the tab to load completely
+    console.log(`Waiting for tab ${tab.id} to load...`);
     await waitForTabLoad(tab.id);
+    console.log(`Tab ${tab.id} loaded`);
 
     // Wait additional time for dynamic content
+    console.log('Waiting 2s for dynamic content...');
     await sleep(2000);
 
     // Execute script to get element value with retry
+    console.log(`Getting element value for selector: ${task.selector}`);
     const currentValue = await getElementWithRetry(tab.id, task.selector, 3);
+    console.log(`Element value obtained: ${currentValue ? 'success' : 'null'}`);
+
+    // Increment check count regardless of whether element was found
+    task.checkCount = (task.checkCount || 0) + 1;
+    task.lastCheck = Date.now();
 
     // Process the result
     if (currentValue !== null) {
       await processElementValue(task, currentValue, tasks);
     } else {
       console.warn(`Element not found: ${task.selector} on ${task.url}`);
+      // Still need to save the updated checkCount and lastCheck
+      const taskIndex = tasks.findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        tasks[taskIndex] = task;
+        await chrome.storage.local.set({ tasks });
+      }
+    }
+
+    // Always close the checker tab after check
+    if (tab) {
+      try {
+        await chrome.tabs.remove(tab.id);
+        console.log('Checker tab closed');
+      } catch (e) {
+        console.warn('Failed to close tab:', e);
+      }
+      checkerTab = null;
     }
   } catch (error) {
     console.error('Error checking task:', error);
+    // Close tab on error
+    if (tab) {
+      try {
+        await chrome.tabs.remove(tab.id);
+        checkerTab = null;
+      } catch (e) {}
+    }
   }
 }
 
@@ -357,23 +474,30 @@ function getElementValue(selector) {
 async function processElementValue(task, currentValue, tasks) {
   const previousValue = task.lastValue;
 
-  task.lastCheck = Date.now();
+  console.log(`Processing task ${task.name}: previousValue=${previousValue ? 'exists' : 'null'}, currentValue=${currentValue ? 'exists' : 'null'}`);
+
+  // Update lastValue (checkCount and lastCheck are already updated in checkTask)
   task.lastValue = currentValue;
 
+  // Detect change: value differs from previous (skip first check when previousValue is null)
   const hasChanged = previousValue !== null && previousValue !== currentValue;
+  
+  console.log(`hasChanged=${hasChanged}, comparison: previousValue !== null = ${previousValue !== null}, previousValue !== currentValue = ${previousValue !== currentValue}`);
+  
   if (hasChanged) {
     task.hasChanged = true;
+    task.lastChangedAt = Date.now(); // Record the time when data changed
+    console.log(`Element changed for task: ${task.name}, setting lastChangedAt to ${task.lastChangedAt}`);
+    await sendChangeNotification(task, currentValue);
   }
 
   const taskIndex = tasks.findIndex(t => t.id === task.id);
   if (taskIndex !== -1) {
     tasks[taskIndex] = task;
-    await chrome.storage.sync.set({ tasks });
+    await chrome.storage.local.set({ tasks });
   }
 
   if (hasChanged) {
-    console.log(`Element changed for task: ${task.name}`);
-    await sendChangeNotification(task, currentValue);
     await updateBadge();
   }
 }
@@ -382,18 +506,25 @@ async function processElementValue(task, currentValue, tasks) {
 async function updateBadge(taskList) {
   let tasks = taskList;
   if (!tasks) {
-    const stored = await chrome.storage.sync.get('tasks');
+    const stored = await chrome.storage.local.get('tasks');
     tasks = stored.tasks || [];
   }
   
   const changedCount = tasks.filter(t => t.hasChanged).length;
+  
+  console.log(`updateBadge: ${changedCount} changed tasks`);
 
-  if (changedCount > 0) {
-    chrome.action.setBadgeText({ text: changedCount.toString() });
-    chrome.action.setBadgeBackgroundColor({ color: '#f44336' });
-    chrome.action.setBadgeTextColor({ color: '#ffffff' });
-  } else {
-    chrome.action.setBadgeText({ text: '' });
+  try {
+    if (changedCount > 0) {
+      await chrome.action.setBadgeText({ text: changedCount.toString() });
+      await chrome.action.setBadgeBackgroundColor({ color: '#f44336' });
+      await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+    } else {
+      await chrome.action.setBadgeText({ text: '' });
+    }
+    console.log('Badge updated successfully');
+  } catch (error) {
+    console.error('Failed to update badge:', error);
   }
 }
 
@@ -407,6 +538,15 @@ async function sendChangeNotification(task, currentValue) {
   const currText = truncate(currentValue);
   const notificationId = `change_${task.id}_${Date.now()}`;
   
+  // Store notification data for click handling BEFORE creating notification
+  // This ensures data is available when user clicks the notification
+  await chrome.storage.local.set({
+    [`notification_${notificationId}`]: {
+      taskId: task.id,
+      taskUrl: task.url
+    }
+  });
+  
   try {
     await chrome.notifications.create(notificationId, {
       type: 'basic',
@@ -419,53 +559,55 @@ async function sendChangeNotification(task, currentValue) {
     console.log('Notification created successfully:', notificationId);
   } catch (error) {
     console.error('Failed to create notification:', error);
+    // Clean up stored data if notification creation failed
+    chrome.storage.local.remove(`notification_${notificationId}`);
   }
-
-  // Store notification data for click handling
-  await chrome.storage.local.set({
-    [`notification_${notificationId}`]: {
-      taskId: task.id,
-      taskUrl: task.url
-    }
-  });
 }
 
 // Handle notification click
 chrome.notifications.onClicked.addListener(async (notificationId) => {
+  console.log('Notification clicked:', notificationId);
+  
   const data = await chrome.storage.local.get(`notification_${notificationId}`);
   const notifyData = data[`notification_${notificationId}`];
 
-  if (notifyData) {
-    if (notifyData.taskId) {
-      const { tasks = [] } = await chrome.storage.sync.get('tasks');
-      const task = tasks.find(t => t.id === notifyData.taskId);
-      if (task) {
-        task.hasChanged = false;
-        await chrome.storage.sync.set({ tasks });
-        await updateBadge();
-      }
+  console.log('Notification data:', notifyData);
+
+  if (notifyData && notifyData.taskId) {
+    const { tasks = [] } = await chrome.storage.local.get('tasks');
+    const taskIndex = tasks.findIndex(t => t.id === notifyData.taskId);
+    
+    if (taskIndex !== -1) {
+      tasks[taskIndex].hasChanged = false;
+      await chrome.storage.local.set({ tasks });
+      await updateBadge(tasks);
+      console.log('Task marked as read:', notifyData.taskId);
     }
 
     chrome.tabs.create({ url: notifyData.taskUrl });
     chrome.notifications.clear(notificationId);
     chrome.storage.local.remove(`notification_${notificationId}`);
+  } else {
+    console.warn('No notification data found for:', notificationId);
   }
 });
 
 // Handle notification button click
 chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
+  console.log('Notification button clicked:', notificationId, buttonIndex);
+  
   const data = await chrome.storage.local.get(`notification_${notificationId}`);
   const notifyData = data[`notification_${notificationId}`];
 
-  if (buttonIndex === 0 && notifyData) {
-    if (notifyData.taskId) {
-      const { tasks = [] } = await chrome.storage.sync.get('tasks');
-      const task = tasks.find(t => t.id === notifyData.taskId);
-      if (task) {
-        task.hasChanged = false;
-        await chrome.storage.sync.set({ tasks });
-        await updateBadge();
-      }
+  if (buttonIndex === 0 && notifyData && notifyData.taskId) {
+    const { tasks = [] } = await chrome.storage.local.get('tasks');
+    const taskIndex = tasks.findIndex(t => t.id === notifyData.taskId);
+    
+    if (taskIndex !== -1) {
+      tasks[taskIndex].hasChanged = false;
+      await chrome.storage.local.set({ tasks });
+      await updateBadge(tasks);
+      console.log('Task marked as read:', notifyData.taskId);
     }
 
     chrome.tabs.create({ url: notifyData.taskUrl });
@@ -476,29 +618,67 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
 
 // Restore alarms on startup
 chrome.runtime.onStartup.addListener(async () => {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  console.log('Extension startup - restoring schedulers');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
+  const taskIds = new Set(tasks.map(t => t.id));
 
+  // Clear orphan alarms (alarms for tasks that no longer exist)
+  const allAlarms = await chrome.alarms.getAll();
+  for (const alarm of allAlarms) {
+    if (alarm.name.startsWith('monitor_')) {
+      const taskId = alarm.name.replace('monitor_', '');
+      if (!taskIds.has(taskId)) {
+        console.log(`Clearing orphan alarm: ${alarm.name}`);
+        await chrome.alarms.clear(alarm.name);
+      }
+    }
+  }
+
+  // Create alarms for active tasks
   for (const task of tasks) {
     if (task.status === 'active') {
       await createAlarmForTask(task);
     }
   }
 
+  // List all alarms for debugging
+  const remainingAlarms = await chrome.alarms.getAll();
+  console.log('All alarms after startup:', remainingAlarms);
+
   updateBadge(tasks);
 });
 
 // Also restore alarms when service worker starts (for MV3)
 (async () => {
-  const { tasks = [] } = await chrome.storage.sync.get('tasks');
+  console.log('Service worker starting - restoring schedulers');
+  const { tasks = [] } = await chrome.storage.local.get('tasks');
+  const taskIds = new Set(tasks.map(t => t.id));
+  console.log(`Found ${tasks.length} tasks, ${tasks.filter(t => t.status === 'active').length} active`);
 
-  for (const task of tasks) {
-    if (task.status === 'active') {
-      const existingAlarm = await chrome.alarms.get(`monitor_${task.id}`);
-      if (!existingAlarm) {
-        await createAlarmForTask(task);
+  // Clear orphan alarms first
+  const allAlarms = await chrome.alarms.getAll();
+  for (const alarm of allAlarms) {
+    if (alarm.name.startsWith('monitor_')) {
+      const taskId = alarm.name.replace('monitor_', '');
+      if (!taskIds.has(taskId)) {
+        console.log(`Clearing orphan alarm: ${alarm.name}`);
+        await chrome.alarms.clear(alarm.name);
       }
     }
   }
+
+  // Always recreate alarms/timers for active tasks on service worker start
+  // This ensures they are properly scheduled after service worker wakes up
+  for (const task of tasks) {
+    if (task.status === 'active') {
+      console.log(`Restoring scheduler for task: ${task.name} (interval: ${task.interval}s)`);
+      await createAlarmForTask(task);
+    }
+  }
+
+  // List all alarms for debugging
+  const remainingAlarms = await chrome.alarms.getAll();
+  console.log('All alarms after service worker start:', remainingAlarms);
 
   updateBadge(tasks);
 })();

@@ -79,6 +79,26 @@
     "message": "Polling interval",
     "description": "Interval label"
   },
+  "checkCountLabel": {
+    "message": "Check count",
+    "description": "Check count label"
+  },
+  "customIntervalLabel": {
+    "message": "Custom interval",
+    "description": "Custom interval label"
+  },
+  "customIntervalUnit": {
+    "message": "min",
+    "description": "Custom interval unit"
+  },
+  "intervalHour": {
+    "message": "h",
+    "description": "Interval time unit: hour"
+  },
+  "intervalDay": {
+    "message": "d",
+    "description": "Interval time unit: day"
+  },
   "currentInterval": {
     "message": "Current: ",
     "description": "Current interval prefix"
@@ -135,11 +155,13 @@
   "interval10s": { "message": "10 seconds" },
   "interval30s": { "message": "30 seconds" },
   "interval1m": { "message": "1 minute" },
+  "interval2m": { "message": "2 minutes" },
   "interval3m": { "message": "3 minutes" },
   "interval5m": { "message": "5 minutes" },
   "interval10m": { "message": "10 minutes" },
   "interval30m": { "message": "30 minutes" },
   "interval1h": { "message": "1 hour" },
+  "interval2h": { "message": "2 hours" },
   "interval6h": { "message": "6 hours" },
   "interval12h": { "message": "12 hours" },
   "interval1d": { "message": "1 day" },
@@ -173,6 +195,14 @@
   "never": {
     "message": "Never",
     "description": "Time: never checked"
+  },
+  "lastCheckLabel": {
+    "message": "Last check",
+    "description": "Last check label"
+  },
+  "lastChangedLabel": {
+    "message": "Last changed",
+    "description": "Last changed label"
   },
   "notificationTaskSaved": {
     "message": "Task saved",
