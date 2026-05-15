@@ -3,6 +3,10 @@
 // Hidden tab for checking elements
 let checkerTab = null;
 
+// Lock to ensure only one task runs at a time
+let isChecking = false;
+const CHECK_DELAY_SECONDS = 5;
+
 // i18n helper
 const i18n = {
   get: (key, sub) => chrome.i18n.getMessage(key, sub) || key
@@ -138,6 +142,16 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await chrome.alarms.clear(alarm.name);
       return;
     }
+
+    // If another task is being checked, delay this one by 5 seconds
+    if (isChecking) {
+      console.log(`Another task is being checked, delaying task ${task.name} by ${CHECK_DELAY_SECONDS}s`);
+      await chrome.alarms.create(alarm.name, {
+        delayInMinutes: CHECK_DELAY_SECONDS / 60,
+        periodInMinutes: task.interval / 60
+      });
+      return;
+    }
     
     await checkTask(taskId);
   }
@@ -235,8 +249,23 @@ async function handleUpdateInterval(taskId, interval, status) {
 // Handle check now
 async function handleCheckNow(taskId) {
   console.log(`handleCheckNow called for task: ${taskId}`);
+
+  // If another task is being checked, delay this one by 5 seconds
+  if (isChecking) {
+    const { tasks = [] } = await chrome.storage.local.get('tasks');
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      console.log(`Another task is being checked, delaying check-now for ${task.name} by ${CHECK_DELAY_SECONDS}s`);
+      await chrome.alarms.create(`monitor_${taskId}`, {
+        delayInMinutes: CHECK_DELAY_SECONDS / 60,
+        periodInMinutes: task.interval / 60
+      });
+    }
+    return;
+  }
+
   try {
-    await checkTask(taskId, true);
+    await checkTask(taskId);
     console.log(`handleCheckNow completed for task: ${taskId}`);
   } catch (error) {
     console.error(`handleCheckNow error for task ${taskId}:`, error);
@@ -280,6 +309,7 @@ async function handleElementPickCancelled() {
 }
 
 // Create alarm for a task
+// If the task has a lastCheck, schedule the first fire based on remaining time
 async function createAlarmForTask(task) {
   const alarmName = `monitor_${task.id}`;
   const intervalSeconds = task.interval;
@@ -287,10 +317,36 @@ async function createAlarmForTask(task) {
 
   console.log(`Creating alarm for task ${task.name}: interval=${intervalSeconds}s (${intervalMinutes} minutes)`);
 
-  // All intervals are >= 1 minute, use Chrome alarms
-  await chrome.alarms.create(alarmName, {
-    periodInMinutes: intervalMinutes
-  });
+  // Calculate first fire time based on lastCheck
+  let alarmInfo;
+  if (task.lastCheck && task.interval > 0) {
+    const nextCheckTime = task.lastCheck + task.interval * 1000;
+    const now = Date.now();
+    if (nextCheckTime > now) {
+      // Not yet time to check, schedule at the calculated time
+      const delayMinutes = (nextCheckTime - now) / 60000;
+      alarmInfo = {
+        when: nextCheckTime,
+        periodInMinutes: intervalMinutes
+      };
+      console.log(`Scheduling first fire at ${new Date(nextCheckTime).toISOString()} (in ${delayMinutes.toFixed(1)} minutes)`);
+    } else {
+      // Already past the scheduled time, fire soon then repeat
+      alarmInfo = {
+        delayInMinutes: 0.01,
+        periodInMinutes: intervalMinutes
+      };
+      console.log(`Past scheduled time, firing soon then every ${intervalMinutes} minutes`);
+    }
+  } else {
+    // No lastCheck (new task or never checked), use periodInMinutes only
+    alarmInfo = {
+      periodInMinutes: intervalMinutes
+    };
+    console.log(`No lastCheck, starting with periodInMinutes=${intervalMinutes}`);
+  }
+
+  await chrome.alarms.create(alarmName, alarmInfo);
 
   // Verify alarm was created
   const alarm = await chrome.alarms.get(alarmName);
@@ -306,7 +362,7 @@ async function stopTaskScheduler(taskId) {
 
 // Check a task
 async function checkTask(taskId, closeAfterCheck = false) {
-  console.log(`checkTask called for ${taskId}, closeAfterCheck=${closeAfterCheck}`);
+  console.log(`checkTask called for ${taskId}`);
   
   const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
@@ -318,6 +374,8 @@ async function checkTask(taskId, closeAfterCheck = false) {
 
   console.log(`Found task: ${task.name}, url: ${task.url}`);
 
+  // Set lock - only one task can be checked at a time
+  isChecking = true;
   let tab = null;
   
   try {
@@ -378,7 +436,9 @@ async function checkTask(taskId, closeAfterCheck = false) {
         await chrome.storage.local.set({ tasks });
       }
     }
-
+  } catch (error) {
+    console.error('Error checking task:', error);
+  } finally {
     // Always close the checker tab after check
     if (tab) {
       try {
@@ -389,15 +449,15 @@ async function checkTask(taskId, closeAfterCheck = false) {
       }
       checkerTab = null;
     }
-  } catch (error) {
-    console.error('Error checking task:', error);
-    // Close tab on error
-    if (tab) {
-      try {
-        await chrome.tabs.remove(tab.id);
-        checkerTab = null;
-      } catch (e) {}
+
+    // Rebuild alarm for next check
+    if (task.status === 'active' && task.interval > 0) {
+      await createAlarmForTask(task);
     }
+
+    // Release lock
+    isChecking = false;
+    console.log(`Task ${task.name} check completed, lock released`);
   }
 }
 
@@ -616,14 +676,17 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
   chrome.storage.local.remove(`notification_${notificationId}`);
 });
 
-// Restore alarms on startup
-chrome.runtime.onStartup.addListener(async () => {
-  console.log('Extension startup - restoring schedulers');
+// Restore alarms - only create missing alarms, don't reset existing ones
+async function restoreAlarms() {
   const { tasks = [] } = await chrome.storage.local.get('tasks');
   const taskIds = new Set(tasks.map(t => t.id));
+  console.log(`Found ${tasks.length} tasks, ${tasks.filter(t => t.status === 'active').length} active`);
+
+  // Get existing alarms
+  const allAlarms = await chrome.alarms.getAll();
+  const alarmNames = new Set(allAlarms.map(a => a.name));
 
   // Clear orphan alarms (alarms for tasks that no longer exist)
-  const allAlarms = await chrome.alarms.getAll();
   for (const alarm of allAlarms) {
     if (alarm.name.startsWith('monitor_')) {
       const taskId = alarm.name.replace('monitor_', '');
@@ -634,51 +697,34 @@ chrome.runtime.onStartup.addListener(async () => {
     }
   }
 
-  // Create alarms for active tasks
+  // Only create alarms for active tasks that don't have one yet
   for (const task of tasks) {
     if (task.status === 'active') {
-      await createAlarmForTask(task);
+      const alarmName = `monitor_${task.id}`;
+      if (!alarmNames.has(alarmName)) {
+        console.log(`Creating missing alarm for task: ${task.name} (interval: ${task.interval}s)`);
+        await createAlarmForTask(task);
+      } else {
+        console.log(`Alarm already exists for task: ${task.name}, skipping`);
+      }
     }
   }
 
   // List all alarms for debugging
   const remainingAlarms = await chrome.alarms.getAll();
-  console.log('All alarms after startup:', remainingAlarms);
+  console.log('All alarms after restore:', remainingAlarms);
 
   updateBadge(tasks);
+}
+
+// Restore alarms on startup
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('Extension startup - restoring schedulers');
+  await restoreAlarms();
 });
 
 // Also restore alarms when service worker starts (for MV3)
 (async () => {
   console.log('Service worker starting - restoring schedulers');
-  const { tasks = [] } = await chrome.storage.local.get('tasks');
-  const taskIds = new Set(tasks.map(t => t.id));
-  console.log(`Found ${tasks.length} tasks, ${tasks.filter(t => t.status === 'active').length} active`);
-
-  // Clear orphan alarms first
-  const allAlarms = await chrome.alarms.getAll();
-  for (const alarm of allAlarms) {
-    if (alarm.name.startsWith('monitor_')) {
-      const taskId = alarm.name.replace('monitor_', '');
-      if (!taskIds.has(taskId)) {
-        console.log(`Clearing orphan alarm: ${alarm.name}`);
-        await chrome.alarms.clear(alarm.name);
-      }
-    }
-  }
-
-  // Always recreate alarms/timers for active tasks on service worker start
-  // This ensures they are properly scheduled after service worker wakes up
-  for (const task of tasks) {
-    if (task.status === 'active') {
-      console.log(`Restoring scheduler for task: ${task.name} (interval: ${task.interval}s)`);
-      await createAlarmForTask(task);
-    }
-  }
-
-  // List all alarms for debugging
-  const remainingAlarms = await chrome.alarms.getAll();
-  console.log('All alarms after service worker start:', remainingAlarms);
-
-  updateBadge(tasks);
+  await restoreAlarms();
 })();
