@@ -6,6 +6,7 @@ const pageSize = 10;
 let editingTaskId = null;
 let searchKeyword = '';
 let allTasks = [];
+let codeEditor = null; // Code editor instance
 
 // i18n helper
 const i18n = {
@@ -37,6 +38,7 @@ const icons = {
 
 document.addEventListener('DOMContentLoaded', () => {
   initI18n();
+  initCodeEditor();
   loadTasks();
   setupEventListeners();
   restorePickState();
@@ -64,6 +66,21 @@ function initI18n() {
   document.getElementById('modalSave').textContent = i18n.get('btnSave');
   document.getElementById('customIntervalLabel').textContent = i18n.get('customIntervalLabel');
   document.getElementById('customIntervalUnit').textContent = i18n.get('customIntervalUnit');
+}
+
+function initCodeEditor() {
+  const section = document.getElementById('userScriptSection');
+  if (!section || !window.__element_monitor_createCodeEditorSection) return;
+
+  codeEditor = window.__element_monitor_createCodeEditorSection({
+    label: i18n.get('userScriptLabel'),
+    placeholder: i18n.get('userScriptPlaceholder'),
+    formatLabel: i18n.get('userScriptFormat'),
+    hint: i18n.get('userScriptHint'),
+    maxHeight: 160
+  });
+
+  section.appendChild(codeEditor.container);
 }
 
 function setupEventListeners() {
@@ -416,12 +433,20 @@ function openEditModal(taskId) {
     }
 
     document.getElementById('editModal').classList.add('show');
+
+    // Set user script editor value
+    if (codeEditor) {
+      codeEditor.setValue(task.userScript || '');
+    }
   });
 }
 
 function closeEditModal() {
   document.getElementById('editModal').classList.remove('show');
   editingTaskId = null;
+  if (codeEditor) {
+    codeEditor.setValue('');
+  }
 }
 
 async function saveInterval() {
@@ -450,13 +475,18 @@ async function saveInterval() {
     task.status = 'paused';
   }
 
+  // Update user script
+  const userScript = codeEditor ? codeEditor.getValue() : '';
+  task.userScript = userScript.trim() || null;
+
   await chrome.storage.local.set({ tasks });
 
   chrome.runtime.sendMessage({
     type: 'UPDATE_INTERVAL',
     taskId: editingTaskId,
     interval: intervalSeconds,
-    status: task.status
+    status: task.status,
+    userScript: task.userScript
   });
 
   closeEditModal();
@@ -503,7 +533,7 @@ async function toggleElementPicker() {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['content/picker.js']
+        files: ['content/code-editor.js', 'content/picker.js']
       });
 
       await chrome.tabs.sendMessage(tab.id, { type: 'START_PICKING' });

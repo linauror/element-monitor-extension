@@ -38,7 +38,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       // Inject picker script (same as popup button)
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['content/picker.js']
+        files: ['content/code-editor.js', 'content/picker.js']
       });
 
       // Send message to start picking
@@ -59,7 +59,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Received message:', message.type, message);
-  
+
   if (message.type === 'GET_DEBUG_INFO') {
     handleGetDebugInfo().then(sendResponse);
     return true; // Keep channel open for async response
@@ -101,7 +101,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.error('Error handling message:', error);
     }
   })();
-  
+
   sendResponse({ ok: true });
   return false;
 });
@@ -132,11 +132,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name.startsWith('monitor_')) {
     const taskId = alarm.name.replace('monitor_', '');
     console.log(`Checking task: ${taskId}`);
-    
+
     // Check if task exists before checking
     const { tasks = [] } = await chrome.storage.local.get('tasks');
     const task = tasks.find(t => t.id === taskId);
-    
+
     if (!task) {
       console.log(`Task ${taskId} not found, clearing orphan alarm`);
       await chrome.alarms.clear(alarm.name);
@@ -152,7 +152,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       });
       return;
     }
-    
+
     await checkTask(taskId);
   }
 });
@@ -169,7 +169,7 @@ async function handleAddTask(task) {
 // Handle save task from picker dialog
 async function handleSaveTask(taskData) {
   console.log('handleSaveTask called with:', taskData);
-  
+
   const task = {
     id: `task_${Date.now()}`,
     url: taskData.url,
@@ -180,6 +180,7 @@ async function handleSaveTask(taskData) {
     lastCheck: null,
     lastChangedAt: null, // Will be set when content changes
     checkCount: 0, // Number of times this task has been checked
+    userScript: taskData.userScript || null, // Custom JS code to execute before checking
     status: taskData.interval === 0 ? 'paused' : 'active',
     createdAt: Date.now()
   };
@@ -195,17 +196,17 @@ async function handleSaveTask(taskData) {
   // Create alarm and do initial check if not manual
   if (task.interval > 0) {
     await createAlarmForTask(task);
-    
+
     // Do initial check immediately
     console.log('Starting initial check for task:', task.id);
     checkTask(task.id).catch(err => console.error('Initial check error:', err));
   }
 
   // Show success notification
-  const statusText = task.interval === 0 
+  const statusText = task.interval === 0
     ? i18n.get('notificationTaskCreatedManual')
     : i18n.get('notificationTaskStarted');
-  
+
   await chrome.notifications.create('task-saved', {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
@@ -230,11 +231,16 @@ async function handleToggleTask(taskId, status) {
 }
 
 // Handle update interval
-async function handleUpdateInterval(taskId, interval, status) {
+async function handleUpdateInterval(taskId, interval, status, userScript) {
   const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
 
   if (!task) return;
+
+  // Update userScript if provided
+  if (userScript !== undefined) {
+    task.userScript = userScript || null;
+  }
 
   // Clear existing scheduler
   await stopTaskScheduler(taskId);
@@ -243,6 +249,13 @@ async function handleUpdateInterval(taskId, interval, status) {
   if (status === 'active' && interval > 0) {
     task.interval = interval;
     await createAlarmForTask(task);
+  }
+
+  // Save updated task
+  const taskIndex = tasks.findIndex(t => t.id === taskId);
+  if (taskIndex !== -1) {
+    tasks[taskIndex] = task;
+    await chrome.storage.local.set({ tasks });
   }
 }
 
@@ -363,7 +376,7 @@ async function stopTaskScheduler(taskId) {
 // Check a task
 async function checkTask(taskId, closeAfterCheck = false) {
   console.log(`checkTask called for ${taskId}`);
-  
+
   const { tasks = [] } = await chrome.storage.local.get('tasks');
   const task = tasks.find(t => t.id === taskId);
 
@@ -377,7 +390,7 @@ async function checkTask(taskId, closeAfterCheck = false) {
   // Set lock - only one task can be checked at a time
   isChecking = true;
   let tab = null;
-  
+
   try {
     // Check if we have a reusable checker tab
     if (checkerTab) {
@@ -390,7 +403,7 @@ async function checkTask(taskId, closeAfterCheck = false) {
         checkerTab = null;
       }
     }
-    
+
     // Create a new tab if needed
     if (!tab) {
       console.log(`Creating new tab for URL: ${task.url}`);
@@ -414,6 +427,50 @@ async function checkTask(taskId, closeAfterCheck = false) {
     // Wait additional time for dynamic content
     console.log('Waiting 2s for dynamic content...');
     await sleep(2000);
+
+    // Execute user script if defined
+    if (task.userScript) {
+      console.log(`Executing user script for task: ${task.name}`);
+      try {
+        // Inject jQuery if not already present on the page
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: () => {
+            if (typeof window.jQuery === 'undefined' && typeof window.$ === 'undefined') {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js';
+              script.id = '__element_monitor_jquery__';
+              document.head.appendChild(script);
+            }
+          }
+        });
+
+        // Wait for jQuery to load
+        await sleep(1000);
+
+        // Execute user script with jQuery available as $ and jQuery
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: (scriptContent) => {
+            try {
+              const fn = new Function('$', 'jQuery', scriptContent);
+              const jq = window.jQuery || window.$;
+              fn(jq, jq);
+            } catch (e) {
+              console.error('User script error:', e);
+            }
+          },
+          args: [task.userScript]
+        });
+        // Wait for user script to take effect
+        await sleep(1000);
+        console.log('User script executed successfully');
+      } catch (error) {
+        console.error('Failed to execute user script:', error);
+      }
+    }
 
     // Execute script to get element value with retry
     console.log(`Getting element value for selector: ${task.selector}`);
@@ -541,9 +598,9 @@ async function processElementValue(task, currentValue, tasks) {
 
   // Detect change: value differs from previous (skip first check when previousValue is null)
   const hasChanged = previousValue !== null && previousValue !== currentValue;
-  
+
   console.log(`hasChanged=${hasChanged}, comparison: previousValue !== null = ${previousValue !== null}, previousValue !== currentValue = ${previousValue !== currentValue}`);
-  
+
   if (hasChanged) {
     task.hasChanged = true;
     task.lastChangedAt = Date.now(); // Record the time when data changed
@@ -569,9 +626,9 @@ async function updateBadge(taskList) {
     const stored = await chrome.storage.local.get('tasks');
     tasks = stored.tasks || [];
   }
-  
+
   const changedCount = tasks.filter(t => t.hasChanged).length;
-  
+
   console.log(`updateBadge: ${changedCount} changed tasks`);
 
   try {
@@ -597,7 +654,7 @@ async function sendChangeNotification(task, currentValue) {
 
   const currText = truncate(currentValue);
   const notificationId = `change_${task.id}_${Date.now()}`;
-  
+
   // Store notification data for click handling BEFORE creating notification
   // This ensures data is available when user clicks the notification
   await chrome.storage.local.set({
@@ -606,7 +663,7 @@ async function sendChangeNotification(task, currentValue) {
       taskUrl: task.url
     }
   });
-  
+
   try {
     await chrome.notifications.create(notificationId, {
       type: 'basic',
@@ -627,7 +684,7 @@ async function sendChangeNotification(task, currentValue) {
 // Handle notification click
 chrome.notifications.onClicked.addListener(async (notificationId) => {
   console.log('Notification clicked:', notificationId);
-  
+
   const data = await chrome.storage.local.get(`notification_${notificationId}`);
   const notifyData = data[`notification_${notificationId}`];
 
@@ -636,7 +693,7 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
   if (notifyData && notifyData.taskId) {
     const { tasks = [] } = await chrome.storage.local.get('tasks');
     const taskIndex = tasks.findIndex(t => t.id === notifyData.taskId);
-    
+
     if (taskIndex !== -1) {
       tasks[taskIndex].hasChanged = false;
       await chrome.storage.local.set({ tasks });
@@ -655,14 +712,14 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
 // Handle notification button click
 chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
   console.log('Notification button clicked:', notificationId, buttonIndex);
-  
+
   const data = await chrome.storage.local.get(`notification_${notificationId}`);
   const notifyData = data[`notification_${notificationId}`];
 
   if (buttonIndex === 0 && notifyData && notifyData.taskId) {
     const { tasks = [] } = await chrome.storage.local.get('tasks');
     const taskIndex = tasks.findIndex(t => t.id === notifyData.taskId);
-    
+
     if (taskIndex !== -1) {
       tasks[taskIndex].hasChanged = false;
       await chrome.storage.local.set({ tasks });

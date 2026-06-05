@@ -259,5 +259,21 @@
   "sendFailed": {
     "message": "发送失败：",
     "description": "发送失败消息前缀"
+  },
+  "userScriptLabel": {
+    "message": "自定义脚本",
+    "description": "自定义脚本区域标签"
+  },
+  "userScriptPlaceholder": {
+    "message": "输入检测前要执行的 JavaScript 代码（支持 jQuery 语法，可用 $ 或 jQuery）...",
+    "description": "自定义脚本编辑器占位符"
+  },
+  "userScriptFormat": {
+    "message": "格式化",
+    "description": "格式化代码按钮"
+  },
+  "userScriptHint": {
+    "message": "代码在读取元素前执行",
+    "description": "自定义脚本提示"
   }
 }

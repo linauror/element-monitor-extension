@@ -259,5 +259,21 @@
   "sendFailed": {
     "message": "Send failed: ",
     "description": "Send failed message prefix"
+  },
+  "userScriptLabel": {
+    "message": "User Script",
+    "description": "User script section label"
+  },
+  "userScriptPlaceholder": {
+    "message": "Enter JavaScript code to execute before checking (jQuery supported, use $ or jQuery)...",
+    "description": "User script editor placeholder"
+  },
+  "userScriptFormat": {
+    "message": "Format",
+    "description": "Format code button"
+  },
+  "userScriptHint": {
+    "message": "Runs on the page before reading the element",
+    "description": "User script hint text"
   }
 }

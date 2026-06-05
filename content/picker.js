@@ -477,6 +477,19 @@
     intervalGroup.appendChild(displayWrapper);
     container.appendChild(intervalGroup);
 
+    // User script section (collapsible code editor)
+    let pickerCodeEditor = null;
+    if (window.__element_monitor_createCodeEditorSection) {
+      pickerCodeEditor = window.__element_monitor_createCodeEditorSection({
+        label: i18n.get('userScriptLabel'),
+        placeholder: i18n.get('userScriptPlaceholder'),
+        formatLabel: i18n.get('userScriptFormat'),
+        hint: i18n.get('userScriptHint'),
+        maxHeight: 150
+      });
+      container.appendChild(pickerCodeEditor.container);
+    }
+
     // Button row
     const buttonRow = document.createElement('div');
     Object.assign(buttonRow.style, {
@@ -538,6 +551,7 @@
 
     saveBtn.addEventListener('click', () => {
       const option = intervalOptions[parseInt(slider.value, 10)];
+      const userScript = pickerCodeEditor ? pickerCodeEditor.getValue().trim() || null : null;
 
       chrome.runtime.sendMessage({
         type: 'SAVE_TASK',
@@ -546,7 +560,8 @@
           selector: selector,
           name: nameInput.value || document.title || i18n.get('untitledTask'),
           interval: option.value,
-          preview: previewContent
+          preview: previewContent,
+          userScript: userScript
         }
       });
 
