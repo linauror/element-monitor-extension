@@ -12,6 +12,7 @@ A Chrome/Edge browser extension that monitors web page element changes and sends
 - **Notification Click** - Click notification to mark as read, badge count decrements automatically
 - **Task Metrics** - Check count, last check time, last changed time per task
 - **Smart Scheduling** - Task queue with exclusive lock to prevent concurrent checks; delayed execution when busy
+- **User Script** - Custom JavaScript code executed before each check, with built-in jQuery support
 - **Task Search** - Real-time search and filter tasks
 - **Task Sorting** - Tasks with recent changes shown first, sorted by last changed time
 
@@ -39,6 +40,39 @@ A Chrome/Edge browser extension that monitors web page element changes and sends
 
 Enter any number of minutes (1 ~ 525600) with a readable display (e.g., 70 minutes shows "1 hour 10 minutes").
 
+## User Script
+
+Each task can optionally include custom JavaScript code that runs on the target page before the element value is read. Common use cases include:
+
+- Clicking a button to expand hidden content
+- Dismissing popups or cookie banners
+- Scrolling to load lazy-loaded content
+- Waiting for AJAX content to render
+
+### jQuery Support
+
+User scripts have jQuery available automatically. If the target page doesn't already have jQuery, it is injected from CDN before the script runs. Use `$` or `jQuery` directly:
+
+```javascript
+// Dismiss a cookie banner
+$('.cookie-banner .accept-btn').click();
+
+// Scroll to bottom to trigger lazy loading
+$('html, body').scrollTop($(document).height());
+
+// Click a "Load more" button
+$('#load-more').click();
+```
+
+### Code Editor
+
+The built-in code editor provides:
+
+- **Line numbers** - Synced with scroll position
+- **Syntax highlighting** - Keywords, strings, comments, numbers (One Dark theme)
+- **Format button** - Auto-indent JavaScript code
+- **Tab support** - Tab key inserts 2 spaces
+
 ## Task Scheduling
 
 - Uses `chrome.alarms` API for reliable periodic scheduling (minimum 1 minute)
@@ -62,6 +96,7 @@ element-monitor-extension/
 │   ├── popup.css
 │   └── popup.js
 ├── content/
+│   ├── code-editor.js
 │   ├── content.js
 │   └── picker.js
 └── icons/
@@ -94,6 +129,7 @@ element-monitor-extension/
   lastCheck: 1234567890,   // timestamp of last check
   lastChangedAt: null,     // timestamp of last content change
   checkCount: 0,           // total number of checks performed
+  userScript: null,         // custom JS code (jQuery supported)
   status: "active",        // "active" or "paused"
   hasChanged: false,       // whether unread change exists
   createdAt: 1234567890
